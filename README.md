@@ -26,9 +26,9 @@ package main
 
 import (
 	"log"
-	"modbus_server"
-	"modbus_server/protocol"
-	"modbus_server/store"
+	"mbserver"
+	"mbserver/protocol"
+	"mbserver/store"
 	"os"
 )
 

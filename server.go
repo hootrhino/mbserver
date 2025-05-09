@@ -1,4 +1,4 @@
-package modbus_server
+package mbserver
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"modbus_server/handler"
-	"modbus_server/protocol"
-	"modbus_server/store"
+	"mbserver/handler"
+	"mbserver/protocol"
+	"mbserver/store"
 )
 
 type Server struct {
@@ -25,8 +25,8 @@ type Server struct {
 	handlers       map[byte]handler.Handler
 	customHandler  func(Request)
 	customHandlers map[byte]func(Request, store.Store) ([]byte, error)
-	connSem        chan struct{} // 用于限制并发连接数
-	activeConns    int64         // 记录当前活跃连接数
+	connSem        chan struct{}
+	activeConns    int64
 }
 
 type Request struct {

@@ -16,8 +16,8 @@
 package handler
 
 import (
-	"modbus_server/protocol"
-	"modbus_server/store"
+	"mbserver/protocol"
+	"mbserver/store"
 )
 
 type MultipleCoilsHandler struct{}
@@ -50,4 +50,3 @@ func (h *MultipleCoilsHandler) Handle(request Request, store store.Store) ([]byt
 	response := append(header, pdu...)
 	return response, nil
 }
-

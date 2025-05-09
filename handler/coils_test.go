@@ -13,29 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package mbserver
+package handler
 
 import (
-	"mbserver/store"
-	"net"
 	"testing"
-	"time"
+
+	"mbserver/protocol"
+	"mbserver/store"
 )
 
-func TestServerStartStop(t *testing.T) {
+func TestCoilsHandler_Handle(t *testing.T) {
+	handler := &CoilsHandler{}
 	memStore := store.NewInMemoryStore().(*store.InMemoryStore)
+	values := []byte{1, 0, 1}
+	memStore.SetCoils(values)
 
-	server := NewServer(memStore, 10)
-
-	err := server.Start(":5020")
-	if err != nil {
-		t.Fatalf("Failed to start server: %v", err)
+	request := Request{
+		Frame:        []byte{0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x01, 0x01, 0x00, 0x00, 0x00, 0x03},
+		SlaveID:      0x01,
+		FuncCode:     protocol.FuncCodeReadCoils,
+		StartAddress: 0,
+		Quantity:     3,
 	}
-	defer server.Stop()
 
-	conn, err := net.DialTimeout("tcp", ":5020", 2*time.Second)
+	response, err := handler.Handle(request, memStore)
 	if err != nil {
-		t.Fatalf("Failed to connect to server: %v", err)
+		t.Fatalf("Failed to handle request: %v", err)
 	}
-	defer conn.Close()
+
+	if response[7] != request.FuncCode {
+		t.Errorf("Response function code mismatch: got %d, want %d", response[7], request.FuncCode)
+	}
 }
+

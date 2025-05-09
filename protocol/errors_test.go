@@ -13,29 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package mbserver
+package protocol
 
 import (
-	"mbserver/store"
-	"net"
 	"testing"
-	"time"
 )
 
-func TestServerStartStop(t *testing.T) {
-	memStore := store.NewInMemoryStore().(*store.InMemoryStore)
-
-	server := NewServer(memStore, 10)
-
-	err := server.Start(":5020")
-	if err != nil {
-		t.Fatalf("Failed to start server: %v", err)
+func TestModbusError_Error(t *testing.T) {
+	err := &ModbusError{
+		Code:    0x01,
+		Message: "Test Modbus error message",
 	}
-	defer server.Stop()
-
-	conn, err := net.DialTimeout("tcp", ":5020", 2*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to connect to server: %v", err)
+	expected := "Test Modbus error message"
+	result := err.Error()
+	if result != expected {
+		t.Errorf("Error() = %s; want %s", result, expected)
 	}
-	defer conn.Close()
 }
+

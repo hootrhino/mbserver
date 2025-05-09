@@ -15,40 +15,37 @@
 
 package handler
 
-
-
 import (
-	"modbus_server/protocol"
-	"modbus_server/store"
+	"mbserver/protocol"
+	"mbserver/store"
 )
 
 type CoilsHandler struct{}
 
 func (h *CoilsHandler) Handle(request Request, store store.Store) ([]byte, error) {
-    values, err := store.GetCoils(request.StartAddress, request.Quantity)
-    if err != nil {
-        return nil, protocol.ErrIllegalDataAddress
-    }
+	values, err := store.GetCoils(request.StartAddress, request.Quantity)
+	if err != nil {
+		return nil, protocol.ErrIllegalDataAddress
+	}
 
-    // Calculate the actual byte count for coils
-    // Coils are packed into bytes, each byte contains 8 coils
-    byteCount := (int(request.Quantity) + 7) / 8
-    if byteCount > len(values) {
-        byteCount = len(values)
-    }
+	// Calculate the actual byte count for coils
+	// Coils are packed into bytes, each byte contains 8 coils
+	byteCount := (int(request.Quantity) + 7) / 8
+	if byteCount > len(values) {
+		byteCount = len(values)
+	}
 
-    // Extract transaction ID from the request frame
-    transactionID := protocol.ExtractTransactionID(request.Frame)
+	// Extract transaction ID from the request frame
+	transactionID := protocol.ExtractTransactionID(request.Frame)
 
-    // Construct response PDU
-    pdu := []byte{request.FuncCode, byte(byteCount)}
-    pdu = append(pdu, values[:byteCount]...)
+	// Construct response PDU
+	pdu := []byte{request.FuncCode, byte(byteCount)}
+	pdu = append(pdu, values[:byteCount]...)
 
-    // Build MBAP header
-    header := protocol.BuildResponseHeader(transactionID, 0, uint16(len(pdu)+1), request.SlaveID)
+	// Build MBAP header
+	header := protocol.BuildResponseHeader(transactionID, 0, uint16(len(pdu)+1), request.SlaveID)
 
-    // Combine header and PDU
-    response := append(header, pdu...)
-    return response, nil
+	// Combine header and PDU
+	response := append(header, pdu...)
+	return response, nil
 }
-

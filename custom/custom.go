@@ -16,7 +16,7 @@
 package custom
 
 import (
-	"modbus_server"
+	modbus_server "mbserver"
 )
 
 type CustomRequestHandler struct {
@@ -32,4 +32,3 @@ func (h *CustomRequestHandler) Handle(request modbus_server.Request) {
 		h.handler(request)
 	}
 }
-

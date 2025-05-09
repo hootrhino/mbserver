@@ -16,8 +16,8 @@
 package handler
 
 import (
-	"modbus_server/protocol"
-	"modbus_server/store"
+	"mbserver/protocol"
+	"mbserver/store"
 )
 
 type SingleRegisterHandler struct{}
@@ -51,4 +51,3 @@ func (h *SingleRegisterHandler) Handle(request Request, store store.Store) ([]by
 	response := append(header, pdu...)
 	return response, nil
 }
-

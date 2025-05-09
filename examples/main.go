@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"modbus_server"
-	"modbus_server/protocol"
-	"modbus_server/store"
+	modbus_server "mbserver"
+	"mbserver/protocol"
+	"mbserver/store"
 	"os"
 )
 

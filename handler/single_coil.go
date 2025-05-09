@@ -16,8 +16,8 @@
 package handler
 
 import (
-	"modbus_server/protocol"
-	"modbus_server/store"
+	"mbserver/protocol"
+	"mbserver/store"
 )
 
 type SingleCoilHandler struct{}
@@ -59,4 +59,3 @@ func (h *SingleCoilHandler) Handle(request Request, store store.Store) ([]byte, 
 	response := append(header, pdu...)
 	return response, nil
 }
-

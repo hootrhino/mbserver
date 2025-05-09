@@ -18,7 +18,7 @@ func Load() (*Config, error) {
 		StoreType:       getEnv("MODBUS_SERVER_STORE_TYPE", "inmemory"),
 		SqliteDSN:       getEnv("MODBUS_SERVER_SQLITE_DSN", "modbus.db"),
 		Timeout:         func() time.Duration {
-			value, exists := os.LookupEnv("MODBUS_SERVER_TIMEOUT")
+			value, exists := os.LookupEnv("mbserver_TIMEOUT")
 			if exists {
 				duration, err := time.ParseDuration(value)
 				if err == nil {

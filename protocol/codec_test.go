@@ -13,29 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package mbserver
+package protocol
 
 import (
-	"mbserver/store"
-	"net"
+	"encoding/binary"
 	"testing"
-	"time"
 )
 
-func TestServerStartStop(t *testing.T) {
-	memStore := store.NewInMemoryStore().(*store.InMemoryStore)
+func TestEncodeUint16(t *testing.T) {
+	value := uint16(0x1234)
+	expected := make([]byte, 2)
+	binary.BigEndian.PutUint16(expected, value)
 
-	server := NewServer(memStore, 10)
-
-	err := server.Start(":5020")
-	if err != nil {
-		t.Fatalf("Failed to start server: %v", err)
+	result := EncodeUint16(value)
+	for i := range expected {
+		if result[i] != expected[i] {
+			t.Errorf("EncodeUint16(%d) byte %d = %d; want %d", value, i, result[i], expected[i])
+		}
 	}
-	defer server.Stop()
-
-	conn, err := net.DialTimeout("tcp", ":5020", 2*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to connect to server: %v", err)
-	}
-	defer conn.Close()
 }
+
