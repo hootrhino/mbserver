@@ -18,8 +18,8 @@ package handler
 import (
 	"testing"
 
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 func TestDiscreteInputsHandler_Handle(t *testing.T) {
@@ -92,4 +92,3 @@ func TestDiscreteInputsHandler_Handle_DifferentQuantity(t *testing.T) {
 		t.Errorf("Response function code mismatch: got %d, want %d", response[7], request.FuncCode)
 	}
 }
-

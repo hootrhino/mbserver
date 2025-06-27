@@ -9,9 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"mbserver/handler"
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/handler"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 type Server struct {

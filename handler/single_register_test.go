@@ -18,8 +18,8 @@ package handler
 import (
 	"testing"
 
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 func TestSingleRegisterHandler_Handle(t *testing.T) {

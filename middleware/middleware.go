@@ -16,7 +16,7 @@
 package middleware
 
 import (
-	modbus_server "mbserver"
+	modbus_server "github.com/hootrhino/mbserver"
 )
 
 // Since modbus_server.Handler is undefined, we'll create a placeholder type for it.

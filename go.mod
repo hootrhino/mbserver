@@ -1,4 +1,4 @@
-module mbserver
+module github.com/hootrhino/mbserver
 
 go 1.24
 

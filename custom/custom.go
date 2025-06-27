@@ -16,7 +16,7 @@
 package custom
 
 import (
-	modbus_server "mbserver"
+	modbus_server "github.com/hootrhino/mbserver"
 )
 
 type CustomRequestHandler struct {

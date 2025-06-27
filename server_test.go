@@ -16,7 +16,7 @@
 package mbserver
 
 import (
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/store"
 	"net"
 	"testing"
 	"time"

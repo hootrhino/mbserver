@@ -16,8 +16,8 @@
 package handler
 
 import (
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 type CoilsHandler struct{}

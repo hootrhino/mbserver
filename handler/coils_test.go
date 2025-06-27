@@ -18,8 +18,8 @@ package handler
 import (
 	"testing"
 
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 func TestCoilsHandler_Handle(t *testing.T) {
@@ -45,4 +45,3 @@ func TestCoilsHandler_Handle(t *testing.T) {
 		t.Errorf("Response function code mismatch: got %d, want %d", response[7], request.FuncCode)
 	}
 }
-

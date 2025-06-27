@@ -16,8 +16,8 @@
 package handler
 
 import (
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 type SingleCoilHandler struct{}
@@ -26,11 +26,12 @@ func (h *SingleCoilHandler) Handle(request Request, store store.Store) ([]byte, 
 	// Extract the coil value from the request frame
 	coilValue := uint16(request.Frame[10])<<8 | uint16(request.Frame[11])
 	var value byte
-	if coilValue == 0xFF00 {
+	switch coilValue {
+	case 0xFF00:
 		value = 1
-	} else if coilValue == 0x0000 {
+	case 0x0000:
 		value = 0
-	} else {
+	default:
 		return nil, protocol.ErrIllegalDataValue
 	}
 

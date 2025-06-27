@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	modbus_server "github.com/hootrhino/mbserver"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 	"log"
-	modbus_server "mbserver"
-	"mbserver/protocol"
-	"mbserver/store"
 	"os"
 )
 
@@ -16,7 +16,7 @@ func main() {
 	// Set sample coil data
 	defaultCoilsSize := 110
 	sampleCoils := make([]byte, defaultCoilsSize)
-	for i := 0; i < defaultCoilsSize; i++ {
+	for i := range defaultCoilsSize {
 		if i%2 == 0 {
 			sampleCoils[i] = 1
 		} else {
@@ -83,8 +83,6 @@ func main() {
 	defer server.Stop()
 
 	// Keep the main goroutine alive
-	select {
-	case <-context.Background().Done():
-		log.Println("Server stopped")
-	}
+	<-context.Background().Done()
+	log.Println("Server stopped")
 }

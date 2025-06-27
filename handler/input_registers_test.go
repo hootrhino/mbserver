@@ -18,8 +18,8 @@ package handler
 import (
 	"testing"
 
-	"mbserver/protocol"
-	"mbserver/store"
+	"github.com/hootrhino/mbserver/protocol"
+	"github.com/hootrhino/mbserver/store"
 )
 
 // TestInputRegistersHandler_Handle tests the normal handling of input registers requests
