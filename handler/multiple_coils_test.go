@@ -18,8 +18,8 @@ package handler
 import (
 	"testing"
 
-	"github.com/hootrhino/mbserver/protocol"
-	"github.com/hootrhino/mbserver/store"
+	"github.com/hootrhino/goodbusserver/protocol"
+	"github.com/hootrhino/goodbusserver/store"
 )
 
 func TestMultipleCoilsHandler_Handle(t *testing.T) {

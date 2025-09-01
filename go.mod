@@ -1,4 +1,4 @@
-module github.com/hootrhino/mbserver
+module github.com/hootrhino/goodbusserver
 
 go 1.24
 

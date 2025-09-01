@@ -1,6 +1,6 @@
 package handler
 
-import "github.com/hootrhino/mbserver/store"
+import "github.com/hootrhino/goodbusserver/store"
 
 type Handler interface {
 	Handle(request Request, store store.Store) ([]byte, error)

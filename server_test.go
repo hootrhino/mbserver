@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hootrhino/mbserver/store"
+	"github.com/hootrhino/goodbusserver/store"
 )
 
 type mockStore struct{ store.Store }

@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	modbus_server "github.com/hootrhino/mbserver"
-	"github.com/hootrhino/mbserver/protocol"
-	"github.com/hootrhino/mbserver/store"
+	modbus_server "github.com/hootrhino/goodbusserver"
+	"github.com/hootrhino/goodbusserver/protocol"
+	"github.com/hootrhino/goodbusserver/store"
 	"log"
 	"os"
 )

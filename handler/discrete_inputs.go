@@ -16,8 +16,8 @@
 package handler
 
 import (
-	"github.com/hootrhino/mbserver/protocol"
-	"github.com/hootrhino/mbserver/store"
+	"github.com/hootrhino/goodbusserver/protocol"
+	"github.com/hootrhino/goodbusserver/store"
 )
 
 type DiscreteInputsHandler struct{}
