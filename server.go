@@ -37,8 +37,8 @@ type Request struct {
 	Quantity     uint16
 }
 
-func NewServer(Store store.Store, maxConns int) *Server {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewServer(ctx context.Context, Store store.Store, maxConns int) *Server {
+	ctx, cancel := context.WithCancel(ctx)
 	server := &Server{
 		ctx:            ctx,
 		cancel:         cancel,
@@ -48,7 +48,7 @@ func NewServer(Store store.Store, maxConns int) *Server {
 		connSem:        make(chan struct{}, maxConns),
 	}
 
-	// Register handlers
+	// Register built-in handlers
 	server.handlers[protocol.FuncCodeReadCoils] = &handler.CoilsHandler{}
 	server.handlers[protocol.FuncCodeReadDiscreteInputs] = &handler.DiscreteInputsHandler{}
 	server.handlers[protocol.FuncCodeReadHoldingRegisters] = &handler.HoldingRegistersHandler{}
@@ -69,28 +69,17 @@ func (s *Server) SetLogger(w io.Writer) {
 	s.logger = log.New(w, "[MODBUS SERVER] ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-func (s *Server) SetCoils(values []byte) error {
-	return s.store.SetCoils(values)
-}
-
-func (s *Server) SetDiscreteInputs(values []byte) error {
-	return s.store.SetDiscreteInputs(values)
-}
-
+func (s *Server) SetCoils(values []byte) error          { return s.store.SetCoils(values) }
+func (s *Server) SetDiscreteInputs(values []byte) error { return s.store.SetDiscreteInputs(values) }
 func (s *Server) SetHoldingRegisters(values []uint16) error {
 	return s.store.SetHoldingRegisters(values)
 }
-
-func (s *Server) SetInputRegisters(values []uint16) error {
-	return s.store.SetInputRegisters(values)
-}
+func (s *Server) SetInputRegisters(values []uint16) error { return s.store.SetInputRegisters(values) }
 
 func (s *Server) Start(addr string) error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		if s.errorHandler != nil {
-			s.errorHandler(err)
-		}
+		s.handleError(nil, "failed to start listener", err)
 		return err
 	}
 	s.listener = listener
@@ -103,28 +92,22 @@ func (s *Server) Start(addr string) error {
 			case <-s.ctx.Done():
 				return
 			default:
-				s.connSem <- struct{}{}
-				conn, err := listener.Accept()
-				if err != nil {
-					<-s.connSem
-					if s.errorHandler != nil {
-						s.errorHandler(err)
-					}
-					continue
-				}
-				atomic.AddInt64(&s.activeConns, 1)
-				s.wg.Add(1)
-				go func(c net.Conn) {
-					defer func() {
-						<-s.connSem
-						atomic.AddInt64(&s.activeConns, -1)
-						s.wg.Done()
-					}()
-					s.handleConnection(c)
-				}(conn)
 			}
+
+			s.connSem <- struct{}{}
+			conn, err := listener.Accept()
+			if err != nil {
+				<-s.connSem
+				s.handleError(nil, "accept failed", err)
+				continue
+			}
+
+			atomic.AddInt64(&s.activeConns, 1)
+			s.wg.Add(1)
+			go s.handleConnection(conn)
 		}
 	}()
+
 	return nil
 }
 
@@ -140,13 +123,17 @@ func (s *Server) OnCustomRequest(h func(Request)) {
 	s.customHandler = h
 }
 
-// RegisterCustomHandler allows users to register custom function code handlers
 func (s *Server) RegisterCustomHandler(code byte, handler func(Request, store.Store) ([]byte, error)) {
 	s.customHandlers[code] = handler
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		atomic.AddInt64(&s.activeConns, -1)
+		<-s.connSem
+		s.wg.Done()
+	}()
 
 	if s.logger != nil {
 		s.logger.Printf("New connection from %s. Active connections: %d", conn.RemoteAddr(), atomic.LoadInt64(&s.activeConns))
@@ -154,106 +141,95 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	buf := make([]byte, 1024)
 	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
 		n, err := conn.Read(buf)
 		if err != nil {
-			if s.errorHandler != nil {
-				s.errorHandler(err)
-			}
-			if s.logger != nil {
-				s.logger.Printf("Error reading from %s: %v", conn.RemoteAddr(), err)
-			}
+			s.handleError(conn, "read failed", err)
 			return
 		}
 
-		if s.logger != nil {
-			s.logger.Printf("Received %d bytes from %s: %s", n, conn.RemoteAddr(), BeautifulByte(buf[:n]))
-		}
-
-		request := parseRequest(buf[:n])
-		if protocol.IsCustomFuncCode(request.FuncCode) {
-			if handler, ok := s.customHandlers[request.FuncCode]; ok {
-				response, err := handler(request, s.store)
-				if err != nil {
-					if s.errorHandler != nil {
-						s.errorHandler(err)
-					}
-					if s.logger != nil {
-						s.logger.Printf("Error handling custom request from %s: %v", conn.RemoteAddr(), err)
-					}
-					continue
-				}
-				if s.logger != nil {
-					s.logger.Printf("Successfully generated response for custom request from %s, preparing to send", conn.RemoteAddr())
-				}
-				s.logger.Printf("Generated response for custom request from %s: %s", conn.RemoteAddr(), BeautifulByte(response))
-				_, err = conn.Write(response)
-				if err != nil {
-					if s.errorHandler != nil {
-						s.errorHandler(err)
-					}
-					if s.logger != nil {
-						s.logger.Printf("Error writing response to %s: %v", conn.RemoteAddr(), err)
-					}
-					return
-				}
-				if s.logger != nil {
-					s.logger.Printf("Sent response to %s: %s", conn.RemoteAddr(), BeautifulByte(response))
-				}
-			} else if s.customHandler != nil {
-				s.customHandler(request)
-			}
+		req, err := s.parseRequestSafe(buf[:n])
+		if err != nil {
+			s.handleError(conn, "parse failed", err)
 			continue
 		}
 
-		if handler, ok := s.handlers[request.FuncCode]; ok {
-			handlerRequest := convertToHandlerRequest(request)
-			if s.logger != nil {
-				s.logger.Printf("Starting to handle request from %s with function code %x", conn.RemoteAddr(), request.FuncCode)
-			}
-			response, err := handler.Handle(handlerRequest, s.store)
-			if err != nil {
-				if s.errorHandler != nil {
-					s.errorHandler(err)
-				}
-				if s.logger != nil {
-					s.logger.Printf("Error handling request from %s: %v", conn.RemoteAddr(), err)
-				}
-				continue
-			}
-			if s.logger != nil {
-				s.logger.Printf("Successfully generated response for %s, preparing to send", conn.RemoteAddr())
-			}
-			s.logger.Printf("Generated response for %s: %s", conn.RemoteAddr(), BeautifulByte(response))
-			_, err = conn.Write(response)
-			if err != nil {
-				if s.errorHandler != nil {
-					s.errorHandler(err)
-				}
-				if s.logger != nil {
-					s.logger.Printf("Error writing response to %s: %v", conn.RemoteAddr(), err)
-				}
-				return
-			}
-			if s.logger != nil {
-				s.logger.Printf("Sent response to %s: %s", conn.RemoteAddr(), BeautifulByte(response))
-			}
-		} else {
-			if s.logger != nil {
-				s.logger.Printf("No handler found for function code %x from %s", request.FuncCode, conn.RemoteAddr())
-			}
+		resp, err := s.dispatchRequest(req)
+		if err != nil {
+			s.handleError(conn, "dispatch failed", err)
+			continue
+		}
+
+		if err := writeResponse(conn, resp); err != nil {
+			s.handleError(conn, "write failed", err)
+			return
 		}
 	}
 }
 
-func BeautifulByte(bytes []byte) string {
-	var result string
-	for i, b := range bytes {
-		if i > 0 && i%16 == 0 {
-			result += "\n"
-		}
-		result += fmt.Sprintf("%02x ", b)
+func (s *Server) dispatchRequest(req Request) ([]byte, error) {
+	if s.logger != nil {
+		s.logger.Printf("Dispatching request: SlaveID=%d, FuncCode=0x%x, StartAddress=%d, Quantity=%d",
+			req.SlaveID, req.FuncCode, req.StartAddress, req.Quantity)
 	}
-	return result
+
+	if h, ok := s.customHandlers[req.FuncCode]; ok {
+		resp, err := h(req, s.store)
+		if s.logger != nil {
+			if err != nil {
+				s.logger.Printf("Custom handler for FuncCode=0x%x failed: %v", req.FuncCode, err)
+			} else {
+				s.logger.Printf("Custom handler for FuncCode=0x%x succeeded, response length=%d", req.FuncCode, len(resp))
+			}
+		}
+		return resp, err
+	}
+
+	if h, ok := s.handlers[req.FuncCode]; ok {
+		resp, err := h.Handle(convertToHandlerRequest(req), s.store)
+		if s.logger != nil {
+			if err != nil {
+				s.logger.Printf("Built-in handler for FuncCode=0x%x failed: %v", req.FuncCode, err)
+			} else {
+				s.logger.Printf("Built-in handler for FuncCode=0x%x succeeded, response length=%d", req.FuncCode, len(resp))
+			}
+		}
+		return resp, err
+	}
+
+	if s.customHandler != nil {
+		s.customHandler(req)
+		if s.logger != nil {
+			s.logger.Printf("Fallback custom handler invoked for FuncCode=0x%x", req.FuncCode)
+		}
+	}
+
+	err := fmt.Errorf("no handler for func code %x", req.FuncCode)
+	s.handleError(nil, "dispatchRequest failed", err)
+	return nil, err
+}
+
+func (s *Server) handleError(conn net.Conn, msg string, err error) {
+	if s.errorHandler != nil {
+		s.errorHandler(err)
+	}
+	if s.logger != nil {
+		if conn != nil {
+			s.logger.Printf("%s (%s): %v", msg, conn.RemoteAddr(), err)
+		} else {
+			s.logger.Printf("%s: %v", msg, err)
+		}
+	}
+}
+
+func writeResponse(conn net.Conn, response []byte) error {
+	_, err := conn.Write(response)
+	return err
 }
 
 func convertToHandlerRequest(req Request) handler.Request {
@@ -266,12 +242,25 @@ func convertToHandlerRequest(req Request) handler.Request {
 	}
 }
 
-func parseRequest(frame []byte) Request {
-	return Request{
+func (s *Server) parseRequestSafe(frame []byte) (Request, error) {
+	if len(frame) < 12 {
+		err := fmt.Errorf("invalid frame length: %d", len(frame))
+		s.handleError(nil, "parseRequestSafe failed", err)
+		return Request{}, err
+	}
+
+	req := Request{
 		Frame:        frame,
 		SlaveID:      frame[6],
 		FuncCode:     frame[7],
 		StartAddress: uint16(frame[8])<<8 | uint16(frame[9]),
 		Quantity:     uint16(frame[10])<<8 | uint16(frame[11]),
 	}
+
+	if s.logger != nil {
+		s.logger.Printf("Parsed request: SlaveID=%d, FuncCode=0x%x, StartAddress=%d, Quantity=%d",
+			req.SlaveID, req.FuncCode, req.StartAddress, req.Quantity)
+	}
+
+	return req, nil
 }

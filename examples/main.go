@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// Create an in-memory store instance
-	memStore := store.NewInMemoryStore().(*store.InMemoryStore)
+	memStore := store.NewInMemoryStore()
 
 	// Set sample coil data
 	defaultCoilsSize := 110
@@ -34,7 +34,7 @@ func main() {
 	// Set maximum concurrent connections
 	maxConns := 100
 	// Initialize a Modbus server
-	server := modbus_server.NewServer(memStore, maxConns)
+	server := modbus_server.NewServer(context.Background(), memStore, maxConns)
 
 	// Set an error handler
 	server.SetErrorHandler(func(err error) {
