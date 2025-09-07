@@ -28,19 +28,28 @@ func (h *InputRegistersHandler) Handle(request Request, store store.Store) ([]by
 		return nil, protocol.ErrIllegalDataAddress
 	}
 
-	// Calculate byte count
-	byteCount := len(values) * 2
-	pdu := make([]byte, 0, 2+byteCount)
-	pdu = append(pdu, request.FuncCode)
-	pdu = append(pdu, byte(byteCount))
-
-	for _, val := range values {
-		pdu = append(pdu, byte(val>>8))
-		pdu = append(pdu, byte(val))
+	// 验证数据长度
+	if len(values) < int(request.Quantity) {
+		return nil, protocol.ErrIllegalDataAddress
 	}
+
+	// 计算实际需要返回的字节数
+	byteCount := int(request.Quantity) * 2
 
 	// Extract transaction ID from the request frame
 	transactionID := protocol.ExtractTransactionID(request.Frame)
+
+	// Construct response PDU
+	pdu := make([]byte, 0, 2+byteCount)
+	pdu = append(pdu, request.FuncCode)
+	pdu = append(pdu, byte(byteCount))
+	
+	// 将uint16数组转换为字节流
+	for i := uint16(0); i < request.Quantity; i++ {
+		value := values[i]
+		pdu = append(pdu, byte(value>>8))
+		pdu = append(pdu, byte(value))
+	}
 
 	// Build MBAP header
 	header := protocol.BuildResponseHeader(transactionID, 0, uint16(len(pdu)+1), request.SlaveID)

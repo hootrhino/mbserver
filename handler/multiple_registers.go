@@ -23,14 +23,44 @@ import (
 type MultipleRegistersHandler struct{}
 
 func (h *MultipleRegistersHandler) Handle(request Request, store store.Store) ([]byte, error) {
-	byteCount := int(request.Frame[12])
-	if byteCount%2 != 0 {
+	if len(request.Frame) < 12 {
 		return nil, protocol.ErrIllegalDataValue
 	}
 
-	values := make([]uint16, byteCount/2)
-	for i := 0; i < len(values); i++ {
-		values[i] = uint16(request.Frame[13+2*i])<<8 | uint16(request.Frame[14+2*i])
+	quantity := request.Quantity
+	if quantity == 0 && len(request.Frame) >= 12 {
+		if len(request.Frame) >= 12 {
+			quantity = uint16(request.Frame[10])<<8 | uint16(request.Frame[11])
+		}
+	}
+
+	values := make([]uint16, quantity)
+	for i := range values {
+		values[i] = 0x0000
+	}
+
+	if len(request.Frame) >= 14 {
+		byteCount := int(request.Frame[12])
+		
+		// 验证字节数是否为偶数（每个寄存器2字节）
+		if byteCount%2 != 0 {
+			return nil, protocol.ErrIllegalDataValue
+		}
+
+		// 验证字节数与寄存器数量的关系
+		expectedByteCount := int(request.Quantity) * 2
+		if byteCount != expectedByteCount {
+			return nil, protocol.ErrIllegalDataValue
+		}
+
+		// 验证数据长度是否足够
+		if len(request.Frame) < 13+byteCount {
+			return nil, protocol.ErrIllegalDataValue
+		}
+
+		for i := 0; i < len(values); i++ {
+			values[i] = uint16(request.Frame[13+2*i])<<8 | uint16(request.Frame[14+2*i])
+		}
 	}
 
 	err := store.SetHoldingRegistersAt(request.StartAddress, values)

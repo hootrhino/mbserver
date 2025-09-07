@@ -23,8 +23,27 @@ import (
 type MultipleCoilsHandler struct{}
 
 func (h *MultipleCoilsHandler) Handle(request Request, store store.Store) ([]byte, error) {
-	byteCount := request.Frame[12]
-	values := request.Frame[13 : 13+byteCount]
+	if len(request.Frame) < 12 {
+		return nil, protocol.ErrIllegalDataValue
+	}
+
+	byteCount := (int(request.Quantity) + 7) / 8
+	values := make([]byte, byteCount)
+
+	if len(request.Frame) >= 14 {
+		expectedByteCount := (int(request.Quantity) + 7) / 8
+		byteCount = int(request.Frame[12])
+		if byteCount != expectedByteCount {
+			return nil, protocol.ErrIllegalDataValue
+		}
+
+		// 验证数据长度是否足够
+		if len(request.Frame) < 13+byteCount {
+			return nil, protocol.ErrIllegalDataValue
+		}
+
+		copy(values, request.Frame[13:13+byteCount])
+	}
 
 	err := store.SetCoilsAt(request.StartAddress, values)
 	if err != nil {

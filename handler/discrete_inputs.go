@@ -28,18 +28,22 @@ func (h *DiscreteInputsHandler) Handle(request Request, store store.Store) ([]by
 		return nil, protocol.ErrIllegalDataAddress
 	}
 
-	// Calculate the actual byte count for discrete inputs
-	// Similar to coils, discrete inputs are packed into bytes, each byte contains 8 inputs
-	byteCount := (int(request.Quantity) + 7) / 8
-	if byteCount > len(values) {
-		byteCount = len(values)
+	// 验证数据长度
+	expectedLength := (int(request.Quantity) + 7) / 8
+	if len(values) < expectedLength {
+		return nil, protocol.ErrIllegalDataAddress
 	}
+
+	// 计算实际需要返回的字节数
+	byteCount := expectedLength
 
 	// Extract transaction ID from the request frame
 	transactionID := protocol.ExtractTransactionID(request.Frame)
 
 	// Construct response PDU
-	pdu := []byte{request.FuncCode, byte(byteCount)}
+	pdu := make([]byte, 0, 2+byteCount)
+	pdu = append(pdu, request.FuncCode)
+	pdu = append(pdu, byte(byteCount))
 	pdu = append(pdu, values[:byteCount]...)
 
 	// Build MBAP header

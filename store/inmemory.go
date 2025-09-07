@@ -32,10 +32,13 @@ func (s *InMemoryStore) GetHoldingRegisters(start uint16, quantity uint16) ([]ui
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	if quantity == 0 {
+		return nil, ErrInvalidAddress
+	}
 	startIdx := int(start)
 	endIdx := startIdx + int(quantity)
 
-	if startIdx < 0 || endIdx > len(s.holdingRegisters) {
+	if startIdx < 0 || startIdx >= len(s.holdingRegisters) || endIdx > len(s.holdingRegisters) {
 		return nil, ErrInvalidAddress
 	}
 
@@ -47,10 +50,13 @@ func (s *InMemoryStore) GetInputRegisters(start uint16, quantity uint16) ([]uint
     s.mu.RLock()
     defer s.mu.RUnlock()
 
+    if quantity == 0 {
+        return nil, ErrInvalidAddress
+    }
     startIdx := int(start)
     endIdx := startIdx + int(quantity)
 
-    if startIdx < 0 || endIdx > len(s.inputRegisters) {
+    if startIdx < 0 || startIdx >= len(s.inputRegisters) || endIdx > len(s.inputRegisters) {
         return nil, ErrInvalidAddress
     }
 
@@ -85,10 +91,14 @@ func (s *InMemoryStore) SetHoldingRegistersAt(start uint16, values []uint16) err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(values) == 0 {
+		return ErrInvalidAddress
+	}
+
 	startIdx := int(start)
 	endIdx := startIdx + len(values)
 
-	if startIdx < 0 || endIdx > len(s.holdingRegisters) {
+	if startIdx < 0 || startIdx > len(s.holdingRegisters) || endIdx > len(s.holdingRegisters) || endIdx < startIdx {
 		return ErrInvalidAddress
 	}
 
@@ -97,13 +107,15 @@ func (s *InMemoryStore) SetHoldingRegistersAt(start uint16, values []uint16) err
 }
 
 func NewInMemoryStore() Store {
-	defaultDiscreteInputsSize := 100 // You can adjust this value
-	defaultCoilsSize := 100          // You can adjust this value
+	defaultDiscreteInputsSize := 1000  // 增加默认大小
+	defaultCoilsSize := 1000          // 增加默认大小
+	defaultHoldingRegistersSize := 1000 // 增加默认大小
+	defaultInputRegistersSize := 1000   // 增加默认大小
 	return &InMemoryStore{
 		coils:            make([]byte, defaultCoilsSize),
 		discreteInputs:   make([]byte, defaultDiscreteInputsSize),
-		holdingRegisters: make([]uint16, 0),
-		inputRegisters:   make([]uint16, 0),
+		holdingRegisters: make([]uint16, defaultHoldingRegistersSize),
+		inputRegisters:   make([]uint16, defaultInputRegistersSize),
 	}
 }
 
@@ -113,6 +125,9 @@ func (s *InMemoryStore) GetDiscreteInputs(start, quantity uint16) ([]byte, error
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	if quantity == 0 {
+		return nil, ErrInvalidAddress
+	}
 	startIdx := int(start)
 	endIdx := startIdx + int(quantity)
 
@@ -125,11 +140,18 @@ func (s *InMemoryStore) GetDiscreteInputs(start, quantity uint16) ([]byte, error
 func (s *InMemoryStore) GetCoils(start, quantity uint16) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	end := int(start) + int(quantity)
-	if end > len(s.coils) {
+
+	if quantity == 0 {
 		return nil, ErrInvalidAddress
 	}
-	return s.coils[start:end], nil
+	startIdx := int(start)
+	endIdx := startIdx + int(quantity)
+
+	if startIdx < 0 || startIdx >= len(s.coils) || endIdx > len(s.coils) {
+		return nil, ErrInvalidAddress
+	}
+
+	return s.coils[startIdx:endIdx], nil
 }
 
 func (s *InMemoryStore) SetCoils(values []byte) error {
@@ -143,10 +165,14 @@ func (s *InMemoryStore) SetCoilsAt(start uint16, values []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(values) == 0 {
+		return ErrInvalidAddress
+	}
+
 	startIdx := int(start)
 	endIdx := startIdx + len(values)
 
-	if startIdx < 0 || endIdx > len(s.coils) {
+	if startIdx < 0 || startIdx > len(s.coils) || endIdx > len(s.coils) || endIdx < startIdx {
 		return ErrInvalidAddress
 	}
 

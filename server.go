@@ -139,7 +139,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 		s.logger.Printf("New connection from %s. Active connections: %d", conn.RemoteAddr(), atomic.LoadInt64(&s.activeConns))
 	}
 
-	buf := make([]byte, 1024)
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -147,13 +146,21 @@ func (s *Server) handleConnection(conn net.Conn) {
 		default:
 		}
 
+		// 为每个请求分配独立缓冲区，避免并发竞争
+		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
 		if err != nil {
-			s.handleError(conn, "read failed", err)
+			if err != net.ErrClosed {
+				s.handleError(conn, "read failed", err)
+			}
 			return
 		}
 
-		req, err := s.parseRequestSafe(buf[:n])
+		// 复制数据避免后续处理中的竞争
+		frame := make([]byte, n)
+		copy(frame, buf[:n])
+
+		req, err := s.parseRequestSafe(frame)
 		if err != nil {
 			s.handleError(conn, "parse failed", err)
 			continue
@@ -249,12 +256,100 @@ func (s *Server) parseRequestSafe(frame []byte) (Request, error) {
 		return Request{}, err
 	}
 
+	// 验证MBAP头部长度字段
+	length := uint16(frame[4])<<8 | uint16(frame[5])
+	if int(length)+6 > len(frame) {
+		err := fmt.Errorf("invalid length field: declared %d, actual %d", length, len(frame)-6)
+		s.handleError(nil, "parseRequestSafe failed", err)
+		return Request{}, err
+	}
+
+	// 验证协议标识符（必须为0）
+	protocolID := uint16(frame[2])<<8 | uint16(frame[3])
+	if protocolID != 0 {
+		err := fmt.Errorf("invalid protocol ID: %d", protocolID)
+		s.handleError(nil, "parseRequestSafe failed", err)
+		return Request{}, err
+	}
+
 	req := Request{
 		Frame:        frame,
 		SlaveID:      frame[6],
 		FuncCode:     frame[7],
 		StartAddress: uint16(frame[8])<<8 | uint16(frame[9]),
 		Quantity:     uint16(frame[10])<<8 | uint16(frame[11]),
+	}
+
+	// 验证功能码特定的要求
+	switch req.FuncCode {
+	case 0x01, 0x02, 0x03, 0x04: // 读操作
+		if req.Quantity == 0 || req.Quantity > 2000 {
+			err := fmt.Errorf("invalid quantity for read: %d (must be 1-2000)", req.Quantity)
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+	case 0x05: // 写单个线圈
+		if len(frame) < 12 {
+			err := fmt.Errorf("frame too short for write single coil")
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+		value := uint16(frame[10])<<8 | uint16(frame[11])
+		if value != 0x0000 && value != 0xFF00 {
+			err := fmt.Errorf("invalid coil value: 0x%04X (must be 0x0000 or 0xFF00)", value)
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+	case 0x06: // 写单个寄存器
+		if len(frame) < 12 {
+			err := fmt.Errorf("frame too short for write single register")
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+	case 0x0F: // 写多个线圈
+		if len(frame) < 14 {
+			err := fmt.Errorf("frame too short for write multiple coils")
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+		byteCount := int(frame[12])
+		expectedBytes := (int(req.Quantity) + 7) / 8
+		if byteCount != expectedBytes {
+			err := fmt.Errorf("invalid byte count: %d, expected %d", byteCount, expectedBytes)
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+		if len(frame) < 13+byteCount {
+			err := fmt.Errorf("frame too short for coil data")
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+	case 0x10: // 写多个寄存器
+		if len(frame) < 14 {
+			err := fmt.Errorf("frame too short for write multiple registers")
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+		byteCount := int(frame[12])
+		expectedBytes := int(req.Quantity) * 2
+		if byteCount != expectedBytes {
+			err := fmt.Errorf("invalid byte count: %d, expected %d", byteCount, expectedBytes)
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+		if len(frame) < 13+byteCount {
+			err := fmt.Errorf("frame too short for register data")
+			s.handleError(nil, "parseRequestSafe failed", err)
+			return Request{}, err
+		}
+	}
+
+	// 验证地址范围
+	maxAddress := uint32(req.StartAddress) + uint32(req.Quantity)
+	if maxAddress > 0xFFFF {
+		err := fmt.Errorf("address overflow: start=%d, quantity=%d", req.StartAddress, req.Quantity)
+		s.handleError(nil, "parseRequestSafe failed", err)
+		return Request{}, err
 	}
 
 	if s.logger != nil {

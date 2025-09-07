@@ -23,6 +23,11 @@ import (
 type SingleRegisterHandler struct{}
 
 func (h *SingleRegisterHandler) Handle(request Request, store store.Store) ([]byte, error) {
+	// 验证帧长度
+	if len(request.Frame) < 12 {
+		return nil, protocol.ErrIllegalDataValue
+	}
+
 	// Extract the register value from the request frame
 	registerValue := uint16(request.Frame[10])<<8 | uint16(request.Frame[11])
 
